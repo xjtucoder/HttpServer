@@ -22,4 +22,3 @@
 
 ## more details
 
-请见[我的博客](http://www.cnblogs.com/broglie/p/5931375.html)。
