@@ -70,6 +70,7 @@ threadpool<T>::~threadpool()
     _stop = true;
 }
 
+//将任务添加到线程池
 template<typename T>
 bool threadpool<T>::add(T* request)
 {

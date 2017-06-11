@@ -63,7 +63,11 @@ void modfd(const int epollfd, const int sockfd, const int ev)
 void addsig(const int signo, void (handler)(int), bool is_restart = true)
 {
     struct sigaction sa;
+
+    //将sa中的所有字节替换为0
     memset(&sa, 0, sizeof(sa));
+
+    //信号处理函数
     sa.sa_handler = handler;
     if(is_restart)
     {
@@ -83,15 +87,18 @@ void show_and_send_error(const int connfd, const std::string msg)
 
 int main(int argc, char **argv)
 {
+    //argv[0] Oh-Server      argv[1] <port>    
     if(argc != 2)
     {
         std::cout << "usage: " << argv[0] << " <port>" << std::endl;
         return 0;
     }
     int port = atoi(argv[1]);
-
+    
+    //注册信号的信号处理函数
     addsig(SIGPIPE, SIG_IGN);
 
+    //创建线程池
     threadpool<http_process> *pool;
     try
     {
@@ -103,30 +110,52 @@ int main(int argc, char **argv)
         delete pool;
         return -1;
     }
-
+    /* TCP服务器初始化过程
+     * 1. socket()
+     * 2. bind()
+     * 3. listen()
+     * 4. accept()
+     * 5. process
+     */
+    //创建一个IPv4，字节流套接字，protocol=0：系统会根据套接字类型决定使用的传输层协议
+    //创建成功返回一个非负的套接字描述符
     int listenfd = socket(AF_INET, SOCK_STREAM, 0);
     assert(listenfd >= 0);
 
     int optval = 1;
+
+    //套接字设置为允许重用本地地址，成功返回0，出错返回-1
     int ret = setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR,
             &optval, sizeof(optval));
     assert(ret >= 0);
 
+    //用作bind、connect、recvfrom、sendto函数的参数，指明地址信息
     struct sockaddr_in servaddr;
     memset(&servaddr, 0, sizeof(servaddr));
     servaddr.sin_family = AF_INET;
+
+    //htonl函数将主机数转换成无符号 长整型 的网络字节序
     servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    
+    //htons函数将主机数转换成无符号 短整型 的网络字节序
     servaddr.sin_port = htons(port);
 
+    //绑定服务器的地址、端口
     ret = bind(listenfd, (struct sockaddr*)&servaddr, sizeof(servaddr));
     assert(ret >= 0);
 
+    //listen(int sockfd, int backlog) backlog规定内核为相应套接字排队的最大连接数
+    //函数成功返回0，出错返回-1
     ret = listen(listenfd, 5);
     assert(ret >= 0);
 
     struct epoll_event evlist[MAX_EVENTS];
+    //生成一个epoll专用的文件描述符。它其实是在内核申请一空间，
+    //用来存放你想关注的socket fd上是否发生以及发生了什么事件。
     int epollfd = epoll_create(5);
     assert(epollfd != -1);
+
+    //add_sockfd()函数内进行epoll事件注册，先注册要监听的事件类型
     add_sockfd(epollfd, listenfd, false);
 
     while(true)
